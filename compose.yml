@@ -14,17 +14,23 @@ services:
       - "${FMDX_WEB_MAP_PORT:-9090}:9090"
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/healthz"]
+      test: [ "CMD", "curl", "-fsS", "http://127.0.0.1:8000/healthz" ]
       interval: 30s
       timeout: 5s
       retries: 3
+    networks: [ frontend ]
 
   redis:
     image: redis:7-alpine
     container_name: fmdx_web_map_redis
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 5s
       timeout: 3s
       retries: 5
+
+networks:
+  frontend:
+    external: true
+    name: frontend
