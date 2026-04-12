@@ -1,0 +1,115 @@
+<header class="topbar navbar navbar-expand-lg navbar-dark">
+  <div class="container-fluid">
+    <a class="navbar-brand topbar-logo" href="/">
+      <img class="topbar-logo__mark" src="{{ url_for('static', filename='logo-fmdx.svg') }}" alt="">
+      <span class="topbar-logo__text">
+        <span class="topbar-logo__eyebrow">FMDX.org</span>
+        <span class="topbar-logo__title">Webservers</span>
+      </span>
+    </a>
+
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+            aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="navbarNav">
+      {% set scope = map_scope|default('world') %}
+      {% if scope == 'world' %}
+        {% set map_url = url_for('index') %}
+      {% else %}
+        {% set map_url = url_for('index', scope=scope) %}
+      {% endif %}
+      {% if scope == 'world' %}
+        {% set stats_url = url_for('statistics_page') %}
+      {% else %}
+        {% set stats_url = url_for('statistics_page', scope=scope) %}
+      {% endif %}
+
+      <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+        <li class="nav-item">
+          <a href="{{ map_url }}"
+             class="nav-link {% if active_page == 'map' %}active{% endif %}"
+             {% if active_page == 'map' %}aria-current="page"{% endif %}>Map</a>
+        </li>
+        <li class="nav-item">
+          <a href="{{ stats_url }}"
+             class="nav-link {% if active_page == 'statistics' %}active{% endif %}"
+             {% if active_page == 'statistics' %}aria-current="page"{% endif %}>Statistics</a>
+        </li>
+      </ul>
+
+      <div class="topbar-actions d-flex flex-column flex-lg-row align-items-lg-center gap-3 ms-lg-3 w-100 w-lg-auto">
+        <div class="topbar-scope">
+          <select id="topbar-scope-select"
+                  class="topbar-scope__select"
+                  data-active-page="{{ active_page }}"
+                  aria-label="Select country scope">
+            {% set options = scope_options or [] %}
+            {% if options %}
+              {% for option in options %}
+                <option value="{{ option.value }}"
+                        {% if option.value == scope %}selected{% endif %}
+                        data-url-map="{{ option.map_url }}"
+                        data-url-statistics="{{ option.statistics_url }}">
+                  {{ option.label }}
+                </option>
+              {% endfor %}
+            {% else %}
+              <option value="{{ scope }}"
+                      selected
+                      data-url-map="{{ map_url }}"
+                      data-url-statistics="{{ stats_url }}">
+                {{ scope_label|default(scope.upper()) }}
+              </option>
+            {% endif %}
+          </select>
+        </div>
+
+        <div class="topbar-right small text-light text-lg-end">
+          {% if active_page == 'statistics' %}
+            <span class="topbar-status">Updated every {{ config['CACHE_TTL'] if config.get('CACHE_TTL') else 60 }}s</span>
+          {% else %}
+            {% set label = scope_label|default('Worldwide') %}
+            {% if scope == 'world' %}
+              <span class="topbar-status">Worldwide receivers</span>
+            {% else %}
+              <span class="topbar-status">{{ label }} receivers</span>
+            {% endif %}
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+<script>
+  (function () {
+    if (typeof document === 'undefined') return;
+
+    function initScopeSwitcher() {
+      var select = document.getElementById('topbar-scope-select');
+      if (!select) return;
+
+      select.addEventListener('change', function () {
+        var activePage = select.getAttribute('data-active-page') || '';
+        var option = select.options[select.selectedIndex];
+        if (!option) return;
+
+        var attr = activePage === 'statistics' ? 'data-url-statistics' : 'data-url-map';
+        var target = option.getAttribute(attr);
+        if (!target && attr !== 'data-url-map') {
+          target = option.getAttribute('data-url-map');
+        }
+        if (target) {
+          window.location.href = target;
+        }
+      });
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initScopeSwitcher);
+    } else {
+      initScopeSwitcher();
+    }
+  }());
+</script>

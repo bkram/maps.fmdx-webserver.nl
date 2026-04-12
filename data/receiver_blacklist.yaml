@@ -1,0 +1,15 @@
+# Receiver blacklist entries organised by scope (ISO2 or slug).
+#
+# Example:
+# blacklist:
+#   nl:
+#     - url: http://receiver.example:8073
+#       coords: [52.1, 4.9]
+#
+#blacklist: {}
+blacklist:
+  nl:
+    - url: https://campello.fmtuner.org/
+      coords: ["38.435976", "-0.426165"]
+    - url: http://217.26.111.150:8100
+      coords: ["50.666872", "4.380798"]

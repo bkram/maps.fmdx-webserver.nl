@@ -1,0 +1,51 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+
+[tool.pylint.main]
+jobs = 1
+persistent = false
+ignore-paths = [
+  "^data/.*$",
+  "^static/.*$",
+  "^templates/.*$",
+]
+
+[tool.pylint.messages_control]
+disable = [
+  "broad-exception-caught",
+  "duplicate-code",
+  "global-statement",
+  "import-outside-toplevel",
+  "invalid-envvar-default",
+  "invalid-name",
+  "line-too-long",
+  "missing-function-docstring",
+  "missing-module-docstring",
+  "missing-class-docstring",
+  "too-few-public-methods",
+  "too-many-arguments",
+  "too-many-branches",
+  "too-many-locals",
+  "too-many-nested-blocks",
+  "too-many-positional-arguments",
+  "too-many-return-statements",
+  "too-many-statements",
+  "unnecessary-ellipsis",
+]
+
+[tool.pylint.format]
+max-line-length = 100
+
+[tool.pylint.design]
+max-args = 8
+max-branches = 20
+max-locals = 25
+max-returns = 10
+max-statements = 75
+
+[tool.vulture]
+paths = ["fmdx_statistics", "tests"]
+exclude = ["data/", "static/", "templates/"]
+min_confidence = 80
+sort_by_size = true

@@ -1,0 +1,4 @@
+-r requirements.txt
+pytest==9.0.2
+pylint==4.0.5
+vulture==2.15

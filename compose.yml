@@ -1,0 +1,30 @@
+services:
+  fmdx_web_map:
+    build:
+      context: .
+    container_name: fmdx_web_map
+    environment:
+      REMOTE_API_URL: ${REMOTE_API_URL:-https://servers.fmdx.org/api/}
+      CACHE_TTL: ${CACHE_TTL:-60}
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
+    ports:
+      - "${FMDX_WEB_MAP_PORT:-8080}:8000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  redis:
+    image: redis:7-alpine
+    container_name: fmdx_web_map_redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5

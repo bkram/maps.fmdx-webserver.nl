@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Online FM-DX Webserver List</title>
+
+  <!-- Bootstrap -->
+  <link rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+        integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN"
+        crossorigin="anonymous">
+
+  <!-- App theme overrides -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
+</head>
+
+<body class="page"
+      data-map-scope="{{ map_scope|default('world') }}"
+      data-map-scope-label="{{ scope_label|default('Worldwide') }}">
+  {% set active_page = 'statistics' %}
+  {% include "_header.html" with context %}
+
+  <main class="container-xxl main-container py-4">
+    {% if dataset_error %}
+    <section class="page-banner" role="status" aria-live="polite">
+      <span class="page-banner__title">Live Dataset Unavailable</span>
+      <div class="page-banner__body">
+        Statistics could not be refreshed from the upstream feed. Values on this page may be missing until the live dataset is available again.
+      </div>
+    </section>
+    {% endif %}
+    <section class="row gap-tight kpi-row">
+      <div class="col-6 col-lg-3">
+        <div class="card kpi kpi--available h-100">
+          <div class="kpi-label text-uppercase">Available</div>
+          <div id="kpi-public" class="kpi-value">–</div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="card kpi kpi--locked h-100">
+          <div class="kpi-label text-uppercase">Locked</div>
+          <div id="kpi-locked" class="kpi-value">–</div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="card kpi kpi--unreachable h-100">
+          <div class="kpi-label text-uppercase">Unreachable</div>
+          <div id="kpi-unreachable" class="kpi-value">–</div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="card kpi kpi--total h-100">
+          <div class="kpi-label text-uppercase">Webservers</div>
+          <div id="kpi-total" class="kpi-value">–</div>
+        </div>
+      </div>
+    </section>
+    <section class="summary-strip">
+      <div class="summary-strip__item">
+        <span class="summary-strip__label">Countries</span>
+        <span id="kpi-countries" class="summary-strip__value">–</span>
+      </div>
+      <div class="summary-strip__item">
+        <span class="summary-strip__label">Supporters</span>
+        <span id="kpi-supporters" class="summary-strip__value">–</span>
+      </div>
+      <div class="summary-strip__item">
+        <span class="summary-strip__label">Scope</span>
+        <span id="kpi-scope" class="summary-strip__value">–</span>
+      </div>
+    </section>
+
+    <section class="row gap-tight chart-row">
+      <div class="col-12 col-lg-6">
+        <div class="panel h-100 d-flex flex-column">
+          <div class="panel-header">
+            <h3 class="h5 mb-0">Status distribution</h3>
+          </div>
+          <div class="panel-body flex-grow-1">
+            <div id="chart-status" class="chart-container"></div>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-lg-6">
+        <div class="panel h-100 d-flex flex-column">
+          <div class="panel-header">
+            <h3 class="h5 mb-0">Operating systems</h3>
+          </div>
+          <div class="panel-body flex-grow-1">
+            <div id="chart-os" class="chart-container"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="row gap-tight table-row" id="section-worldwide-summary">
+      <div class="col-12 col-lg-6">
+        <div class="panel h-100">
+          <div class="panel-header">
+            <h3 class="h5 mb-0">Continents</h3>
+          </div>
+          <div class="panel-body">
+            <div class="table-responsive">
+              <table class="table table-dark table-borderless align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th scope="col">#</th>
+                    <th scope="col">Continent</th>
+                    <th scope="col" class="num">Count</th>
+                    <th scope="col" class="num">Share</th>
+                    <th scope="col" class="num">Per 1M</th>
+                  </tr>
+                </thead>
+                <tbody id="tbl-continents"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-lg-6">
+        <div class="panel h-100">
+          <div class="panel-header">
+            <h3 class="h5 mb-0" id="tbl-countries-heading">Top countries</h3>
+          </div>
+          <div class="panel-body">
+            <div class="table-responsive">
+              <table class="table table-dark table-borderless align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th scope="col">#</th>
+                    <th scope="col">Country</th>
+                    <th scope="col" class="num">Count</th>
+                    <th scope="col" class="num">Share</th>
+                    <th scope="col" class="num" id="tbl-countries-per-capita-heading">Per 1M</th>
+                  </tr>
+                </thead>
+                <tbody id="tbl-countries"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="row gap-tight table-row" id="section-country-os">
+      <div class="col-12">
+        <div class="panel h-100">
+          <div class="panel-header">
+            <h3 class="h5 mb-0" id="country-os-heading">OS mix by top countries</h3>
+          </div>
+          <div class="panel-body">
+            <div id="country-os-grid" class="country-os-grid row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="row gap-tight table-row">
+      <div class="col-12 col-lg-6">
+        <div class="panel h-100">
+          <div class="panel-header">
+            <h3 class="h5 mb-0">Tuner models</h3>
+          </div>
+          <div class="panel-body">
+            <div class="table-responsive">
+              <table class="table table-dark table-borderless align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th scope="col">#</th>
+                    <th scope="col">Tuner</th>
+                    <th scope="col" class="num">Count</th>
+                    <th scope="col" class="num">Share</th>
+                  </tr>
+                </thead>
+                <tbody id="tbl-tuner"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-lg-6">
+        <div class="panel h-100">
+          <div class="panel-header">
+            <h3 class="h5 mb-0">Audio channels</h3>
+          </div>
+          <div class="panel-body">
+            <div class="table-responsive">
+              <table class="table table-dark table-borderless align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th scope="col">#</th>
+                    <th scope="col">Channels</th>
+                    <th scope="col" class="num">Count</th>
+                    <th scope="col" class="num">Share</th>
+                  </tr>
+                </thead>
+                <tbody id="tbl-audio-channels"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="row gap-tight table-row">
+      <div class="col-12 col-lg-6">
+        <div class="panel h-100">
+          <div class="panel-header">
+            <h3 class="h5 mb-0">Software versions</h3>
+          </div>
+          <div class="panel-body">
+            <div class="table-responsive">
+              <table class="table table-dark table-borderless align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th scope="col">#</th>
+                    <th scope="col">Version</th>
+                    <th scope="col" class="num">Count</th>
+                    <th scope="col" class="num">Share</th>
+                  </tr>
+                </thead>
+                <tbody id="tbl-version"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-lg-6">
+        <div class="panel h-100">
+          <div class="panel-header">
+            <h3 class="h5 mb-0">Audio quality</h3>
+          </div>
+          <div class="panel-body">
+            <div class="table-responsive">
+              <table class="table table-dark table-borderless align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th scope="col">#</th>
+                    <th scope="col">Quality</th>
+                    <th scope="col" class="num">Count</th>
+                    <th scope="col" class="num">Share</th>
+                  </tr>
+                </thead>
+                <tbody id="tbl-audio-quality"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script
+    src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"
+    integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL"
+    crossorigin="anonymous">
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+  <script>
+    const PALETTE = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#a855f7', '#06b6d4', '#84cc16', '#eab308'];
+
+    let currentStats = null;
+    let resizeTimer = null;
+    const regionDisplay = typeof Intl !== 'undefined' && typeof Intl.DisplayNames === 'function'
+      ? new Intl.DisplayNames(['en'], { type: 'region' })
+      : null;
+
+    document.addEventListener('DOMContentLoaded', init);
+
+    async function init() {
+      const stats = await loadStats();
+      currentStats = stats;
+      renderKPIs(stats);
+      renderCharts(stats);
+      renderTables(stats);
+
+      window.addEventListener('resize', () => {
+        if (!currentStats) return;
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => renderCharts(currentStats), 150);
+      });
+    }
+
+    const scopeAttr = document.body ? document.body.getAttribute('data-map-scope') : '';
+    const statsScope = (scopeAttr || 'world').trim().toLowerCase();
+
+    async function loadStats() {
+      const params = new URLSearchParams();
+      if (statsScope) params.set('scope', statsScope);
+      params.set('nocache', Date.now());
+
+      const resp = await fetch('/api/stats?' + params.toString(), {
+        cache: 'no-store',
+        headers: { 'Pragma': 'no-cache', 'Cache-Control': 'no-store' }
+      });
+      if (!resp.ok) throw new Error('Failed to fetch /api/stats');
+      return resp.json();
+    }
+
+    function renderKPIs(stats) {
+      const s = stats.summary || {};
+      const publicCount = Number(s.status?.public ?? 0);
+      const lockedCount = Number(s.status?.locked ?? 0);
+      const total = Number(s.total ?? 0);
+      const unreachableCount = Math.max(total - publicCount - lockedCount, 0);
+      const scopeId = String(s.scope?.id || 'world').trim().toLowerCase();
+      const scopeLabel = scopeId === 'world'
+        ? 'Worldwide'
+        : (document.body?.getAttribute('data-map-scope-label') || scopeId.toUpperCase());
+
+      document.getElementById('kpi-public').textContent = publicCount;
+      document.getElementById('kpi-locked').textContent = lockedCount;
+      document.getElementById('kpi-unreachable').textContent = unreachableCount;
+      document.getElementById('kpi-total').textContent = s.total ?? '–';
+      document.getElementById('kpi-countries').textContent = s.countriesCovered ?? '–';
+      document.getElementById('kpi-supporters').textContent = s.supporters ?? '–';
+      document.getElementById('kpi-scope').textContent = scopeLabel;
+    }
+
+    function renderCharts(stats) {
+      renderStatusChart(stats.summary?.status || {});
+      renderOsChart(stats.byOsFamily || {});
+    }
+
+    function renderTables(stats) {
+      const total = stats.summary?.total ?? 0;
+      const currentScopeId = String(stats.summary?.scope?.id || 'world').trim().toLowerCase();
+      const isWorldScope = currentScopeId === 'world';
+      const continents = Object.entries(stats.byContinent || {})
+        .filter(([, value]) => Number(value) > 0)
+        .sort((a, b) => b[1] - a[1]);
+      const byContinentPerMillion = stats.byContinentPerMillion || {};
+      const osByCountry = stats.osByCountry || {};
+      const byCountryPerMillion = stats.byCountryPerMillion || {};
+      const osBySubdivision = stats.osBySubdivision || {};
+      const subdivisions = stats.subdivisions || {};
+      const subdivisionEntries = Object.entries(subdivisions.counts || {})
+        .filter(([, value]) => Number(value) > 0)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 12);
+      const hasSubdivisions = subdivisionEntries.length > 0 && typeof subdivisions.label === 'string';
+
+      fillTbody(
+        'tbl-continents',
+        continents,
+        total,
+        value => value || 'Unknown',
+        key => formatPerMillion(byContinentPerMillion?.[key])
+      );
+
+      const countriesHeading = document.getElementById('tbl-countries-heading');
+      const perCapitaHeading = document.getElementById('tbl-countries-per-capita-heading');
+      const osHeading = document.getElementById('country-os-heading');
+      const worldwideSection = document.getElementById('section-worldwide-summary');
+      const countryOsSection = document.getElementById('section-country-os');
+
+      if (worldwideSection) {
+        worldwideSection.classList.toggle('d-none', !isWorldScope);
+      }
+
+      if (hasSubdivisions) {
+        if (countryOsSection) countryOsSection.classList.remove('d-none');
+        const label = String(subdivisions.label || 'Regions');
+        if (countriesHeading) {
+          countriesHeading.textContent = `Top ${label.toLowerCase()}`;
+        }
+        if (perCapitaHeading) {
+          perCapitaHeading.textContent = 'Per 1M';
+          perCapitaHeading.classList.add('d-none');
+        }
+        if (osHeading) {
+          osHeading.textContent = `${label} OS mix`;
+        }
+        fillTbody('tbl-countries', subdivisionEntries, total, value => value || 'Unknown', null);
+        renderCountryOsTables(subdivisionEntries, osBySubdivision, {
+          labelFn: value => value || 'Unknown',
+          showCode: false,
+          emptyMessage: `No ${label.toLowerCase()} data available.`,
+        });
+      } else {
+        if (countryOsSection) countryOsSection.classList.toggle('d-none', !isWorldScope);
+        if (countriesHeading) countriesHeading.textContent = 'Top countries';
+        if (perCapitaHeading) {
+          perCapitaHeading.textContent = 'Per 1M';
+          perCapitaHeading.classList.remove('d-none');
+        }
+        if (osHeading) osHeading.textContent = 'OS mix by top countries';
+
+        if (isWorldScope) {
+          const countries = Object.entries(stats.byCountry || {})
+            .filter(([c, n]) => {
+              const code = (c || '').trim().toUpperCase();
+              return code && code !== '??' && Number(n) > 0;
+            })
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 12);
+          fillTbody(
+            'tbl-countries',
+            countries,
+            total,
+            formatCountryLabel,
+            code => formatPerMillion(byCountryPerMillion?.[code])
+          );
+          renderCountryOsTables(countries, osByCountry);
+        }
+      }
+
+      const tuners = Object.entries(stats.byTuner || {})
+        .sort((a, b) => b[1] - a[1]).slice(0, 20);
+      fillTbody('tbl-tuner', tuners, total, x => x || 'Unknown');
+
+      const versions = Object.entries(stats.byVersion || {})
+        .filter(([, value]) => Number(value) > 0)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 20);
+      fillTbody('tbl-version', versions, total, value => value || 'Unknown');
+
+      const audioQuality = Object.entries(stats.byAudioQuality || {})
+        .filter(([, value]) => Number(value) > 0)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 15);
+      fillTbody('tbl-audio-quality', audioQuality, total, value => value || 'Unknown');
+
+      const audioChannels = Object.entries(stats.byAudioChannels || {})
+        .filter(([, value]) => Number(value) > 0)
+        .sort((a, b) => b[1] - a[1]);
+      fillTbody('tbl-audio-channels', audioChannels, total, formatAudioChannelsLabel);
+    }
+
+    function fillTbody(id, entries, total, labelFn, extraValueFn = null) {
+      const tbody = document.getElementById(id);
+      if (!tbody) return;
+      tbody.innerHTML = '';
+      entries.forEach(([key, count], i) => {
+        const tr = document.createElement('tr');
+        const extraValue = typeof extraValueFn === 'function' ? extraValueFn(key, count) : '';
+        tr.innerHTML =
+          `<td>${i + 1}</td>` +
+          `<td>${labelFn(key)}</td>` +
+          `<td class="num">${count}</td>` +
+          `<td class="num">${pct(count, total)}</td>` +
+          `<td class="num">${extraValue || ''}</td>`;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function formatPerMillion(value) {
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric) || numeric <= 0) return '–';
+      if (numeric >= 100) return numeric.toFixed(0);
+      if (numeric >= 10) return numeric.toFixed(1);
+      return numeric.toFixed(2);
+    }
+
+    function formatAudioChannelsLabel(value) {
+      const numeric = Number(value);
+      if (Number.isFinite(numeric) && numeric > 0) {
+        if (numeric === 1) {
+          return '1 (Mono)';
+        }
+        if (numeric === 2) {
+          return '2 (Stereo)';
+        }
+        return `${numeric} Channels`;
+      }
+      const text = typeof value === 'string' ? value.trim() : '';
+      return text || 'Unknown';
+    }
+
+    function pct(n, total) {
+      const value = Number(n);
+      const denom = Number(total);
+      if (!denom || !Number.isFinite(value)) return '0%';
+      return (Math.round((value / denom) * 1000) / 10).toFixed(1) + '%';
+    }
+
+    function countryName(code) {
+      if (!code || code === '??') return 'Unknown';
+      if (!regionDisplay) return code;
+      try {
+        return regionDisplay.of(code) || code;
+      } catch (err) {
+        return code;
+      }
+    }
+
+    function formatCountryLabel(code) {
+      if (!code || code === '??') return 'Unknown';
+      const name = countryName(code);
+      return name && name !== code ? `${name} (${code})` : code;
+    }
+
+    function renderCountryOsTables(countries, osByCountry, options = {}) {
+      const labelFn = typeof options.labelFn === 'function' ? options.labelFn : formatCountryLabel;
+      const showCode = options.showCode !== false;
+      const emptyMessage = typeof options.emptyMessage === 'string'
+        ? options.emptyMessage
+        : 'No country data available.';
+      const grid = document.getElementById('country-os-grid');
+      if (!grid) return;
+      grid.innerHTML = '';
+
+      if (!countries.length) {
+        const msg = document.createElement('p');
+        msg.className = 'text-muted mb-0';
+        msg.textContent = emptyMessage;
+        grid.appendChild(msg);
+        return;
+      }
+
+      countries.forEach(([code, totalCount], index) => {
+        const col = document.createElement('div');
+        col.className = 'col d-flex';
+
+        const card = document.createElement('div');
+        card.className = 'country-os-card h-100 flex-grow-1';
+
+        const header = document.createElement('div');
+        header.className = 'country-os-card__header d-flex justify-content-between align-items-center mb-3';
+
+        const title = document.createElement('div');
+        title.className = 'country-os-card__title d-flex align-items-baseline flex-wrap gap-2';
+
+        const rank = document.createElement('span');
+        rank.className = 'country-os-card__rank';
+        rank.textContent = `#${index + 1}`;
+
+        const nameEl = document.createElement('span');
+        nameEl.className = 'country-os-card__name';
+        nameEl.textContent = labelFn(code);
+
+        title.append(rank, nameEl);
+        if (showCode && code && code !== '??') {
+          const codeEl = document.createElement('span');
+          codeEl.className = 'country-os-card__code text-muted text-uppercase';
+          codeEl.textContent = code;
+          title.appendChild(codeEl);
+        }
+
+        const totalBadge = document.createElement('span');
+        totalBadge.className = 'badge bg-primary-subtle';
+        totalBadge.textContent = totalCount;
+
+        header.append(title, totalBadge);
+        card.appendChild(header);
+
+        const tableWrap = document.createElement('div');
+        tableWrap.className = 'table-responsive';
+
+        const table = document.createElement('table');
+        table.className = 'table table-dark table-borderless table-sm align-middle mb-0';
+
+        const thead = document.createElement('thead');
+        const headRow = document.createElement('tr');
+        ['OS', 'Count', 'Share'].forEach((label, idx) => {
+          const th = document.createElement('th');
+          th.scope = 'col';
+          th.textContent = label;
+          if (idx > 0) th.className = 'num';
+          headRow.appendChild(th);
+        });
+        thead.appendChild(headRow);
+        table.appendChild(thead);
+
+        const tbody = document.createElement('tbody');
+        const entries = Object.entries(osByCountry?.[code] || {})
+          .filter(([, value]) => Number(value) > 0)
+          .sort((a, b) => b[1] - a[1]);
+        const localTotal = entries.reduce((sum, [, value]) => sum + Number(value || 0), 0) || Number(totalCount) || 0;
+
+        if (!entries.length) {
+          const row = document.createElement('tr');
+          const cell = document.createElement('td');
+          cell.colSpan = 3;
+          cell.className = 'text-muted fst-italic';
+          cell.textContent = 'No data';
+          row.appendChild(cell);
+          tbody.appendChild(row);
+        } else {
+          entries.forEach(([osName, count]) => {
+            const numericCount = Number(count) || 0;
+            const row = document.createElement('tr');
+
+            const osCell = document.createElement('td');
+            osCell.textContent = osName || 'Unknown';
+
+            const countCell = document.createElement('td');
+            countCell.className = 'num';
+            countCell.textContent = numericCount;
+
+            const shareCell = document.createElement('td');
+            shareCell.className = 'num';
+            shareCell.textContent = pct(numericCount, localTotal);
+
+            row.append(osCell, countCell, shareCell);
+            tbody.appendChild(row);
+          });
+        }
+
+        table.appendChild(tbody);
+        tableWrap.appendChild(table);
+        card.appendChild(tableWrap);
+
+        col.appendChild(card);
+        grid.appendChild(col);
+      });
+    }
+
+    function renderStatusChart(status) {
+      const container = d3.select('#chart-status');
+      container.selectAll('*').remove();
+
+      const entries = Object.entries(status || {}).filter(([, v]) => Number(v) > 0);
+      if (!entries.length) {
+        container.append('p').attr('class', 'text-muted text-center mb-0').text('No status data available');
+        return;
+      }
+
+      const rect = container.node().getBoundingClientRect();
+      const size = Math.min(Math.max(rect.width, 220), 400);
+      const radius = size / 2;
+
+      const svg = container
+        .append('svg')
+        .attr('class', 'chart-svg')
+        .attr('viewBox', `0 0 ${size} ${size}`)
+        .attr('preserveAspectRatio', 'xMidYMid meet');
+
+      const g = svg.append('g').attr('transform', `translate(${size / 2}, ${size / 2})`);
+
+      const pie = d3.pie().sort(null).value(d => d[1]);
+      const arc = d3.arc().innerRadius(radius * 0.6).outerRadius(radius - 8);
+      const arcs = pie(entries);
+
+      g.selectAll('path')
+        .data(arcs)
+        .enter()
+        .append('path')
+        .attr('d', arc)
+        .attr('fill', (d, i) => PALETTE[i % PALETTE.length])
+        .attr('stroke', '#0f172a')
+        .attr('stroke-width', 2);
+
+      const total = d3.sum(entries, d => d[1]);
+      g.append('text')
+        .attr('class', 'chart-total')
+        .attr('text-anchor', 'middle')
+        .attr('dy', '0.35em')
+        .text(total);
+
+      const legend = container.append('div').attr('class', 'chart-legend mt-3');
+      legend.selectAll('div')
+        .data(arcs)
+        .enter()
+        .append('div')
+        .attr('class', 'legend-item d-flex align-items-center gap-2')
+        .html((d, i) => {
+          const label = d.data[0];
+          const value = d.data[1];
+          const share = pct(value, total);
+          return `<span class="legend-swatch" style="background:${PALETTE[i % PALETTE.length]}"></span>` +
+                 `<span class="legend-label flex-grow-1 text-capitalize">${label}</span>` +
+                 `<span class="legend-value">${value} · ${share}</span>`;
+        });
+    }
+
+    function renderOsChart(osFamilies) {
+      const container = d3.select('#chart-os');
+      container.selectAll('*').remove();
+
+      const entries = Object.entries(osFamilies || {})
+        .filter(([, v]) => Number(v) > 0)
+        .sort((a, b) => b[1] - a[1]);
+
+      if (!entries.length) {
+        container.append('p').attr('class', 'text-muted text-center mb-0').text('No OS data available');
+        return;
+      }
+
+      const rect = container.node().getBoundingClientRect();
+      const width = Math.max(rect.width, 320);
+      const height = 360;
+      const margin = { top: 24, right: 24, bottom: 90, left: 64 };
+
+      const svg = container
+        .append('svg')
+        .attr('class', 'chart-svg')
+        .attr('viewBox', `0 0 ${width} ${height}`)
+        .attr('preserveAspectRatio', 'xMidYMid meet');
+
+      const x = d3.scaleBand()
+        .domain(entries.map(d => d[0]))
+        .range([margin.left, width - margin.right])
+        .padding(0.25);
+
+      const y = d3.scaleLinear()
+        .domain([0, d3.max(entries, d => d[1]) || 1])
+        .nice()
+        .range([height - margin.bottom, margin.top]);
+
+      const colors = entries.map((d, i) => PALETTE[i % PALETTE.length]);
+
+      svg.append('g')
+        .attr('class', 'axis axis-x')
+        .attr('transform', `translate(0, ${height - margin.bottom})`)
+        .call(d3.axisBottom(x).tickSizeOuter(0))
+        .call(g => g.selectAll('text')
+          .attr('class', 'axis-label')
+          .attr('transform', 'rotate(-35)')
+          .style('text-anchor', 'end')
+          .attr('dx', '-0.4em')
+          .attr('dy', '0.9em'));
+
+      svg.append('g')
+        .attr('class', 'axis axis-y')
+        .attr('transform', `translate(${margin.left}, 0)`)
+        .call(d3.axisLeft(y).ticks(5).tickSizeOuter(0))
+        .call(g => g.selectAll('text').attr('class', 'axis-label'));
+
+      svg.append('g')
+        .selectAll('rect')
+        .data(entries)
+        .enter()
+        .append('rect')
+        .attr('x', d => x(d[0]))
+        .attr('width', x.bandwidth())
+        .attr('y', d => y(d[1]))
+        .attr('height', d => Math.max(0, y(0) - y(d[1])))
+        .attr('rx', 6)
+        .attr('fill', (d, i) => colors[i]);
+
+      svg.append('g')
+        .selectAll('text')
+        .data(entries)
+        .enter()
+        .append('text')
+        .attr('class', 'bar-label')
+        .attr('x', d => x(d[0]) + x.bandwidth() / 2)
+        .attr('y', d => y(d[1]) - 8)
+        .attr('text-anchor', 'middle')
+        .text(d => d[1]);
+
+      const total = d3.sum(entries, d => d[1]);
+
+      const legend = container.append('div').attr('class', 'chart-legend legend-grid mt-3');
+      legend.selectAll('div')
+        .data(entries)
+        .enter()
+        .append('div')
+        .attr('class', 'legend-item d-flex align-items-center gap-2')
+        .html((d, i) => {
+          const share = pct(d[1], total);
+          return `<span class="legend-swatch" style="background:${colors[i]}"></span>` +
+                 `<span class="legend-label flex-grow-1 text-capitalize">${d[0]}</span>` +
+                 `<span class="legend-value">${d[1]} · ${share}</span>`;
+        });
+    }
+  </script>
+</body>
+
+</html>
