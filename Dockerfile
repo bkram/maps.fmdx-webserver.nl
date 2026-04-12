@@ -28,10 +28,10 @@ COPY data ./data
 RUN useradd -u 10001 -m appuser
 USER appuser
 
-EXPOSE 8000
+EXPOSE 9090
 
 # Healthcheck uses a lightweight route without upstream dependencies
-HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD curl -fsS http://127.0.0.1:8000/healthz || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD curl -fsS http://127.0.0.1:9090/healthz || exit 1
 
 # Gunicorn with Flask app factory
-CMD ["gunicorn", "-w", "3", "-b", "0.0.0.0:8000", "fmdx_statistics.app:create_app()"]
+CMD ["gunicorn", "-w", "3", "-b", "0.0.0.0:9090", "fmdx_statistics.app:create_app()"]
