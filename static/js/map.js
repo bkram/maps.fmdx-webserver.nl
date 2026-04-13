@@ -45,15 +45,40 @@ const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 const noLabels = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
   subdomains: 'abcd', maxZoom: 20, attribution: '&copy; OSM &copy; CARTO'
 });
+const dark = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
+  subdomains: 'abcd', maxZoom: 20, attribution: '&copy; OSM &copy; CARTO'
+});
+const voyager = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+  subdomains: 'abcd', maxZoom: 20, attribution: '&copy; OSM &copy; CARTO'
+});
+const hot = L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
+  maxZoom: 20, attribution: '&copy; OpenStreetMap contributors, Tiles style by Humanitarian OpenStreetMap Team'
+});
+const topo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+  maxZoom: 17, attribution: 'Map data: &copy; OpenStreetMap contributors, SRTM | Map style: &copy; OpenTopoMap'
+});
+const esriStreet = L.tileLayer(
+  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+  { attribution: 'Tiles &copy; Esri' }
+);
 const satellite = L.tileLayer(
   'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
   { attribution: 'Tiles © Esri' }
 ).addTo(map);
 
 L.control.layers(
-  { 'Satellite': satellite, 'OSM Roads': osm, 'No Labels': noLabels },
+  {
+    'Satellite': satellite,
+    'OSM Roads': osm,
+    'OSM HOT': hot,
+    'Light': noLabels,
+    'Dark': dark,
+    'Voyager': voyager,
+    'Topographic': topo,
+    'Esri Streets': esriStreet
+  },
   {},
-  { collapsed: true, position: 'topleft' }
+  { collapsed: true, position: 'topright' }
 ).addTo(map);
 
 addEventListener('load',  () => map.invalidateSize());
@@ -104,6 +129,9 @@ const sideAvailableEl = document.getElementById('side-available');
 const sideLockedEl = document.getElementById('side-locked');
 const sideUnreachableEl = document.getElementById('side-unreachable');
 const DESKTOP_MEDIA_QUERY = '(min-width: 901px)';
+const desktopMediaQuery = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+  ? window.matchMedia(DESKTOP_MEDIA_QUERY)
+  : null;
 
 const scopeAttr = document.body ? document.body.getAttribute('data-map-scope') : null;
 const scopeValue = typeof scopeAttr === 'string' ? scopeAttr.trim().toLowerCase() : '';
@@ -122,7 +150,13 @@ const sidebarToggleTarget = isWorldScope
   ? 'worldwide server list'
   : `${scopeLabel} server list`;
 
-if (sidebarEl && sidebarEl.classList.contains('map-sidebar--hidden')) {
+if (
+  sidebarEl
+  && (
+    sidebarEl.classList.contains('map-sidebar--hidden')
+    || (desktopMediaQuery && !desktopMediaQuery.matches)
+  )
+) {
   sidebarHidden = true;
 }
 
@@ -217,6 +251,21 @@ function setupSidebarToggleControl() {
 }
 
 setupSidebarToggleControl();
+
+function syncSidebarLayout() {
+  if (!sidebarEl) return;
+  if (!desktopMediaQuery) return;
+
+  setSidebarVisibility(!desktopMediaQuery.matches);
+}
+
+if (desktopMediaQuery) {
+  if (typeof desktopMediaQuery.addEventListener === 'function') {
+    desktopMediaQuery.addEventListener('change', syncSidebarLayout);
+  } else if (typeof desktopMediaQuery.addListener === 'function') {
+    desktopMediaQuery.addListener(syncSidebarLayout);
+  }
+}
 
 // ================ Utils ================
 const cleanString = (value) =>
@@ -1459,6 +1508,7 @@ async function load() {
 
 // ================ Boot ================
 document.addEventListener('DOMContentLoaded', () => {
+  syncSidebarLayout();
   map.on('click', () => setActive(null));
   map.on('zoomend', refreshMarkerOffsets);
   document.addEventListener('keydown', e => e.key==='Escape' && setActive(null));

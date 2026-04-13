@@ -65,7 +65,7 @@ Start the development server:
 FLASK_DEBUG=1 python -m fmdx_statistics.app
 ```
 
-The app listens on `http://127.0.0.1:8080` by default.
+The app listens on `http://127.0.0.1:9090` by default.
 
 ## Configuration
 
@@ -79,7 +79,7 @@ Environment variables:
 
 - `REMOTE_API_URL`: remote dataset endpoint
 - `CACHE_TTL`: API/cache TTL in seconds, default `60`
-- `PORT`: HTTP port, default `8080`
+- `PORT`: HTTP port, default `9090`
 - `REDIS_URL`: Redis connection URL, default `redis://redis:6379/0`
 
 ## Reverse Geocoding Data
@@ -134,13 +134,35 @@ For local testing with Redis:
 docker compose up --build
 ```
 
-The app is published on `http://127.0.0.1:8080` by default.
+The app is published on `http://127.0.0.1:9090` by default.
 
 Optional overrides:
 
-- `FMDX_WEB_MAP_PORT`: host port for the web app, default `8080`
+- `FMDX_WEB_MAP_PORT`: host port for the web app, default `9090`
 - `REMOTE_API_URL`: remote dataset endpoint
 - `CACHE_TTL`: cache TTL in seconds, default `60`
+
+### Production Compose
+
+For production-style deployment on an existing external Docker network named
+`frontend`, use:
+
+```bash
+docker compose -f compose.prod.yml up --build -d
+```
+
+This file:
+
+- exposes the app to the `frontend` Docker network instead of publishing a host port
+- connects the app to the shared `frontend` network for proxy access
+- keeps Redis on a private internal `backend` network used only by this stack
+- uses the same `/healthz` check on container port `9090`
+
+Before using it, ensure the external network exists:
+
+```bash
+docker network create frontend
+```
 
 ## Data Files
 

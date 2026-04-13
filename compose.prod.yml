@@ -10,14 +10,17 @@ services:
     depends_on:
       redis:
         condition: service_healthy
-    ports:
-      - "${FMDX_WEB_MAP_PORT:-9090}:9090"
+    expose:
+      - "9090"
     restart: unless-stopped
     healthcheck:
       test: [ "CMD", "curl", "-fsS", "http://127.0.0.1:9090/healthz" ]
       interval: 30s
       timeout: 5s
       retries: 3
+    networks:
+      - frontend
+      - backend
 
   redis:
     image: redis:7-alpine
@@ -28,3 +31,12 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
+    networks:
+      - backend
+
+networks:
+  frontend:
+    external: true
+    name: frontend
+  backend:
+    internal: true
